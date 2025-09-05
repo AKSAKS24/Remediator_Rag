@@ -22,6 +22,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY environment variable is required.")
 
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+if os.getenv("LANGCHAIN_API_KEY"):
+    os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
+
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
 CHROMA_DIR   = os.getenv("CHROMA_DIR", "chroma_rules")
 RULESET_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ruleset.txt")
