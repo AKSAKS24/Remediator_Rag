@@ -1,0 +1,112 @@
+ABAP Syntax Remediation Rules
+================================
+
+Rule 1 — Replace SELECT SINGLE * with explicit field list
+---------------------------------------------------------
+What to do:
+- Change `SELECT SINGLE * FROM ...` to `SELECT SINGLE <field_list> FROM ...`.
+- Prefer `SELECT SINGLE` over `SELECT ... UP TO 1 ROWS` when fetching one row by (full) key.
+
+Why:
+- Safer, clearer, avoids pulling unused columns and keeps result structure stable.
+
+Examples:
+Before:
+  SELECT SINGLE * FROM mara WHERE matnr = lv_matnr INTO wa_mara.
+After:
+  SELECT SINGLE matnr meins mtart FROM mara
+         INTO CORRESPONDING FIELDS OF wa_mara
+         WHERE matnr = lv_matnr.  " Added By PwcYYYY-MM-DD
+
+Before (anti-pattern):
+  SELECT * FROM mara INTO wa_mara
+         WHERE matnr = lv_matnr
+         UP TO 1 ROWS.
+  ENDSELECT.
+After:
+  SELECT SINGLE matnr meins mtart FROM mara
+         INTO CORRESPONDING FIELDS OF wa_mara
+         WHERE matnr = lv_matnr.  " Added By PwcYYYY-MM-DD
+
+Rule 2 — Do not declare AFLE amount variables as TYPE p LENGTH 23 DECIMALS 2
+----------------------------------------------------------------------------
+
+What to do:
+- For AFLE amount fields, do not use TYPE p LENGTH 23 DECIMALS 2 (invalid: P length max is 16).
+- Use the DDIC amount element (e.g., DMBTR) always for AFLE amount variables.
+
+Why:
+- ABAP TYPE p length is bytes (1..16), not digits. LENGTH 23 is invalid.
+- Using DDIC amount types (e.g., DMBTR) aligns with AFLE-compliant precision/scale and DB mappings.
+
+Examples:
+Before (wrong):
+  DATA lv_amount TYPE p LENGTH 23 DECIMALS 2.   " WRONG: P length > 16 bytes
+After (correct):
+  DATA lv_amount TYPE dmbtr.                    " Added By PwcYYYY-MM-DD
+
+Rule 3 — Do NOT add ORDER BY to SELECT SINGLE
+---------------------------------------------
+
+What to do:
+- Do **not** append any `ORDER BY` clause to `SELECT SINGLE`.
+- If you fetch one row **by full primary key**, use `SELECT SINGLE ... WHERE <full key>`.
+- If you truly need the “top” row by a sort criterion, use:
+  - an aggregate (e.g., MIN/MAX) when possible, **or**
+  - `SELECT <field_list> FROM ... WHERE ... ORDER BY ... UP TO 1 ROWS.`
+
+Why:
+- `SELECT SINGLE` is intended for key-based, deterministic access; adding `ORDER BY` is semantically wrong and misleading.
+- For ordered picks, use explicit `ORDER BY ... UP TO 1 ROWS` (and a field list), or an aggregate for clarity and performance.
+
+Examples:
+Before (anti-pattern):
+  SELECT SINGLE * FROM mara
+         WHERE matnr = lv_matnr
+         ORDER BY ersda DESC
+         INTO wa_mara.
+
+After (key-based, deterministic):
+  SELECT SINGLE matnr meins mtart ersda FROM mara
+         INTO CORRESPONDING FIELDS OF wa_mara
+         WHERE matnr = lv_matnr.  " Added By PwcYYYY-MM-DD
+
+After (ordered top-1 by a criterion):
+  SELECT matnr meins mtart ersda FROM mara
+         INTO CORRESPONDING FIELDS OF wa_mara
+         WHERE matnr LIKE lv_mat_pattern
+         ORDER BY ersda DESC
+         UP TO 1 ROWS.  " Added By PwcYYYY-MM-DD
+
+Rule 4 — Comma-separated field lists: escape INTO/WHERE with @, ORDER BY uses commas
+-----------------------------------------------------------------------------------
+
+What to do:
+- When you list fields in `SELECT` or `SELECT SINGLE` separated by commas, you must:
+  - Escape host variables in the `INTO` clause with `@`.
+  - Escape host variables in the `WHERE` clause with `@`.
+  - Separate fields in the `ORDER BY` clause with commas.
+- Do not leave `ORDER BY` fields space-separated when commas are used in the field list.
+
+Why:
+- Modern ABAP SQL syntax requires `@` escaping when host variables are used together with comma-separated field lists.
+- Ensures consistency, avoids ambiguous parsing, and enforces correct Open SQL syntax.
+
+Examples:
+Before:
+  SELECT *
+         INTO TABLE lt_data
+         WHERE matnr IN s_matnr
+         ORDER BY ersda DESC.
+
+After (wrong):
+  SELECT matnr, meins, mtart FROM mara
+         INTO TABLE lt_data
+         WHERE matnr IN s_matnr
+         ORDER BY ersda mtart DESC.  " Added By PwcYYYY-MM-DD
+
+After (correct):
+  SELECT matnr, meins, mtart FROM mara
+         INTO TABLE @lt_data
+         WHERE matnr IN @s_matnr
+         ORDER BY ersda, mtart DESC.  " Added By PwcYYYY-MM-DD
